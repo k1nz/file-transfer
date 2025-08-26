@@ -28,25 +28,82 @@ const FileUploader = ({ onUploadSuccess }) => {
     setIsDragOver(false)
   }
 
-  const handleDrop = (e) => {
+  // 递归读取文件夹内容
+  const readDirectoryRecursively = async (entry, path = '') => {
+    const files = []
+    
+    if (entry.isFile) {
+      return new Promise((resolve) => {
+        entry.file((file) => {
+          // 设置文件的相对路径
+          Object.defineProperty(file, 'webkitRelativePath', {
+            value: path + file.name,
+            writable: false
+          })
+          resolve([file])
+        })
+      })
+    } else if (entry.isDirectory) {
+      const dirReader = entry.createReader()
+      const entries = await new Promise((resolve) => {
+        dirReader.readEntries(resolve)
+      })
+      
+      for (const childEntry of entries) {
+        const childFiles = await readDirectoryRecursively(childEntry, path + entry.name + '/')
+        files.push(...childFiles)
+      }
+    }
+    
+    return files
+  }
+
+  const handleDrop = async (e) => {
     e.preventDefault()
     setIsDragOver(false)
     
-    // 检查是否支持文件夹拖拽
     const items = Array.from(e.dataTransfer.items)
-    const hasDirectories = items.some(item => item.webkitGetAsEntry && item.webkitGetAsEntry().isDirectory)
+    const allFiles = []
     
-    if (hasDirectories) {
-      showToast({
-        title: '不支持文件夹拖拽',
-        description: '请使用"选择文件夹"按钮上传文件夹',
-        type: 'warning'
-      })
-      return
+    // 处理拖拽的项目（可能包含文件和文件夹）
+    for (const item of items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry()
+        if (entry) {
+          try {
+            const files = await readDirectoryRecursively(entry)
+            allFiles.push(...files)
+          } catch (error) {
+            console.error('读取文件夹失败:', error)
+            showToast({
+              title: '文件夹读取失败',
+              description: `无法读取 "${entry.name}"`,
+              type: 'error'
+            })
+          }
+        }
+      }
     }
     
-    const files = Array.from(e.dataTransfer.files)
-    addFiles(files)
+    // 如果没有通过 webkitGetAsEntry 获取到文件，回退到传统方式
+    if (allFiles.length === 0) {
+      const files = Array.from(e.dataTransfer.files)
+      allFiles.push(...files)
+    }
+    
+    if (allFiles.length > 0) {
+      addFiles(allFiles)
+      
+      // 检查是否包含文件夹
+      const hasFolderFiles = allFiles.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'))
+      if (hasFolderFiles) {
+        showToast({
+          title: '文件夹拖拽成功',
+          description: `成功读取 ${allFiles.length} 个文件`,
+          type: 'success'
+        })
+      }
+    }
   }
 
   const handleFileSelect = (e) => {
@@ -233,10 +290,10 @@ const FileUploader = ({ onUploadSuccess }) => {
       >
         <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
         <p className="text-lg font-medium text-gray-700 mb-2">
-          拖拽文件到此处上传
+          拖拽文件或文件夹到此处上传
         </p>
         <p className="text-sm text-gray-500 mb-4">
-          或者点击下方按钮选择文件或文件夹
+          支持单个文件、多个文件、文件夹拖拽，或点击下方按钮选择
         </p>
         
         {/* 上传模式选择 */}
