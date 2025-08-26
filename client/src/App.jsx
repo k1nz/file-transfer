@@ -26,7 +26,7 @@ function App() {
             <div className="flex justify-between items-center">
               <div className="text-center flex-1">
                 <h1 className="text-4xl font-bold text-gray-800 mb-2">
-                  文件传输系统
+                  File Transfer
                 </h1>
                 <p className="text-gray-600">
                   拖拽文件或点击上传按钮来传输文件
