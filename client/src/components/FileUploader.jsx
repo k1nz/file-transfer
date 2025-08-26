@@ -9,7 +9,9 @@ const FileUploader = ({ onUploadSuccess }) => {
   const [selectedFiles, setSelectedFiles] = useState([])
   const [uploadProgress, setUploadProgress] = useState({})
   const [isUploading, setIsUploading] = useState(false)
+  const [uploadMode, setUploadMode] = useState('files') // 'files' or 'folder'
   const fileInputRef = useRef(null)
+  const folderInputRef = useRef(null)
   const { showToast } = useToast()
 
   const handleDragOver = (e) => {
@@ -25,6 +27,20 @@ const FileUploader = ({ onUploadSuccess }) => {
   const handleDrop = (e) => {
     e.preventDefault()
     setIsDragOver(false)
+    
+    // 检查是否支持文件夹拖拽
+    const items = Array.from(e.dataTransfer.items)
+    const hasDirectories = items.some(item => item.webkitGetAsEntry && item.webkitGetAsEntry().isDirectory)
+    
+    if (hasDirectories) {
+      showToast({
+        title: '不支持文件夹拖拽',
+        description: '请使用"选择文件夹"按钮上传文件夹',
+        type: 'warning'
+      })
+      return
+    }
+    
     const files = Array.from(e.dataTransfer.files)
     addFiles(files)
   }
@@ -38,7 +54,8 @@ const FileUploader = ({ onUploadSuccess }) => {
     const newFiles = files.map(file => ({
       id: Math.random().toString(36).substr(2, 9),
       file,
-      status: 'pending' // pending, uploading, success, error
+      status: 'pending', // pending, uploading, success, error
+      relativePath: file.webkitRelativePath || file.name // 保存相对路径用于文件夹上传
     }))
     setSelectedFiles(prev => [...prev, ...newFiles])
   }
@@ -157,19 +174,61 @@ const FileUploader = ({ onUploadSuccess }) => {
           拖拽文件到此处上传
         </p>
         <p className="text-sm text-gray-500 mb-4">
-          或者点击下方按钮选择文件
+          或者点击下方按钮选择文件或文件夹
         </p>
-        <button
-          type="button"
-          onClick={() => fileInputRef.current?.click()}
-          className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
-        >
-          选择文件
-        </button>
+        
+        {/* 上传模式选择 */}
+        <div className="flex items-center justify-center gap-4 mb-4">
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="files"
+              checked={uploadMode === 'files'}
+              onChange={(e) => setUploadMode(e.target.value)}
+              className="mr-2"
+            />
+            <span className="text-sm text-gray-700">文件</span>
+          </label>
+          <label className="flex items-center">
+            <input
+              type="radio"
+              value="folder"
+              checked={uploadMode === 'folder'}
+              onChange={(e) => setUploadMode(e.target.value)}
+              className="mr-2"
+            />
+            <span className="text-sm text-gray-700">文件夹</span>
+          </label>
+        </div>
+        
+        <div className="space-x-3">
+          <button
+            type="button"
+            onClick={() => {
+              if (uploadMode === 'files') {
+                fileInputRef.current?.click()
+              } else {
+                folderInputRef.current?.click()
+              }
+            }}
+            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
+          >
+            {uploadMode === 'files' ? '选择文件' : '选择文件夹'}
+          </button>
+        </div>
+        
         <input
           ref={fileInputRef}
           type="file"
           multiple
+          onChange={handleFileSelect}
+          className="hidden"
+        />
+        <input
+          ref={folderInputRef}
+          type="file"
+          multiple
+          webkitdirectory=""
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -201,10 +260,13 @@ const FileUploader = ({ onUploadSuccess }) => {
                   {getStatusIcon(fileItem.status)}
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-gray-800 truncate">
-                      {fileItem.file.name}
+                      {fileItem.relativePath || fileItem.file.name}
                     </p>
                     <p className="text-xs text-gray-500">
                       {formatFileSize(fileItem.file.size)}
+                      {fileItem.relativePath && fileItem.relativePath !== fileItem.file.name && (
+                        <span className="ml-2 text-blue-500">📁 文件夹上传</span>
+                      )}
                     </p>
                   </div>
                 </div>
