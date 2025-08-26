@@ -7,6 +7,30 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3001;
 
+// 解析命令行参数
+const args = process.argv.slice(2);
+let maxFileSize = 100; // 默认100MB
+
+// 查找文件大小限制参数
+const maxSizeIndex = args.indexOf('--max-size');
+if (maxSizeIndex !== -1 && args[maxSizeIndex + 1]) {
+    const sizeArg = args[maxSizeIndex + 1];
+    const parsedSize = parseInt(sizeArg);
+    if (!isNaN(parsedSize) && parsedSize > 0) {
+        maxFileSize = parsedSize;
+    } else {
+        console.log(`⚠️  无效的文件大小限制参数: ${sizeArg}，使用默认值 ${maxFileSize}MB`);
+    }
+}
+
+// 也支持环境变量
+if (process.env.MAX_FILE_SIZE) {
+    const envSize = parseInt(process.env.MAX_FILE_SIZE);
+    if (!isNaN(envSize) && envSize > 0) {
+        maxFileSize = envSize;
+    }
+}
+
 // 确保上传目录存在
 const uploadDir = path.join(__dirname, '../uploads');
 if (!fs.existsSync(uploadDir)) {
@@ -55,21 +79,15 @@ const storage = multer.diskStorage({
         // 确保正确处理中文文件名
         const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
         
-        // 生成唯一文件名，保留原始扩展名
-        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const extension = path.extname(originalName);
-        const baseName = path.basename(originalName, extension);
-        
-        // 构建文件名，确保中文字符正确显示
-        const fileName = `${baseName}-${uniqueSuffix}${extension}`;
-        cb(null, fileName);
+        // 直接使用原文件名
+        cb(null, originalName);
     }
 });
 
 const upload = multer({
     storage: storage,
     limits: {
-        fileSize: 100 * 1024 * 1024, // 100MB 限制
+        fileSize: maxFileSize * 1024 * 1024, // 使用配置的文件大小限制
     },
     fileFilter: (req, file, cb) => {
         // 这里可以添加文件类型过滤逻辑
@@ -88,6 +106,40 @@ app.get('/', (req, res) => {
             download: 'GET /api/download/:filename'
         }
     });
+});
+
+// 检查文件是否存在接口
+app.post('/api/check-files', (req, res) => {
+    try {
+        const { fileNames } = req.body;
+        
+        if (!fileNames || !Array.isArray(fileNames)) {
+            return res.status(400).json({
+                success: false,
+                message: '请提供文件名列表'
+            });
+        }
+
+        const conflicts = [];
+        fileNames.forEach(fileName => {
+            const filePath = path.join(uploadDir, fileName);
+            if (fs.existsSync(filePath)) {
+                conflicts.push(fileName);
+            }
+        });
+
+        res.json({
+            success: true,
+            conflicts: conflicts
+        });
+    } catch (error) {
+        console.error('检查文件冲突错误:', error);
+        res.status(500).json({
+            success: false,
+            message: '检查文件冲突失败',
+            error: error.message
+        });
+    }
 });
 
 // 文件上传接口
@@ -230,7 +282,7 @@ app.use((error, req, res, next) => {
         if (error.code === 'LIMIT_FILE_SIZE') {
             return res.status(400).json({
                 success: false,
-                message: '文件大小超过限制 (100MB)'
+                message: `文件大小超过限制 (${maxFileSize}MB)`
             });
         }
     }
@@ -265,6 +317,7 @@ app.listen(PORT, '0.0.0.0', () => {
     
     console.log(`🚀 文件传输服务器已启动`);
     console.log(`📁 文件存储目录: ${uploadDir}`);
+    console.log(`📏 文件大小限制: ${maxFileSize}MB`);
     console.log(`\n🌐 访问地址:`);
     console.log(`   本地访问: http://localhost:${PORT}`);
     console.log(`   本地访问: http://127.0.0.1:${PORT}`);
@@ -284,4 +337,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`   POST /api/upload    - 文件上传`);
     console.log(`   GET  /api/files     - 文件列表`);
     console.log(`   GET  /api/download  - 文件下载`);
+    console.log(`\n⚙️  启动参数:`);
+    console.log(`   --max-size <MB>     - 设置文件大小限制 (当前: ${maxFileSize}MB)`);
+    console.log(`   例如: node index.js --max-size 200`);
 });

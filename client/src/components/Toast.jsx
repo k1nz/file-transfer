@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react'
-import { CheckCircle, AlertCircle, X } from 'lucide-react'
+import { CheckCircle, AlertCircle, AlertTriangle, X } from 'lucide-react'
 
 const ToastContext = createContext()
 
@@ -36,6 +36,8 @@ export const ToastProvider = ({ children }) => {
         return <CheckCircle className="h-5 w-5 text-green-500" />
       case 'error':
         return <AlertCircle className="h-5 w-5 text-red-500" />
+      case 'warning':
+        return <AlertTriangle className="h-5 w-5 text-yellow-500" />
       default:
         return <AlertCircle className="h-5 w-5 text-blue-500" />
     }
@@ -47,6 +49,8 @@ export const ToastProvider = ({ children }) => {
         return 'bg-green-50 border-green-200'
       case 'error':
         return 'bg-red-50 border-red-200'
+      case 'warning':
+        return 'bg-yellow-50 border-yellow-200'
       default:
         return 'bg-blue-50 border-blue-200'
     }

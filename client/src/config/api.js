@@ -21,7 +21,8 @@ export const API_CONFIG = {
     upload: '/api/upload',
     files: '/api/files',
     download: '/api/download',
-    delete: '/api/files'
+    delete: '/api/files',
+    checkFiles: '/api/check-files'
   }
 };
 

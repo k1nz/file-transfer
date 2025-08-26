@@ -3,6 +3,7 @@ import { Upload, File, X, CheckCircle, AlertCircle } from 'lucide-react'
 import axios from 'axios'
 import { useToast } from './Toast'
 import { API_CONFIG } from '../config/api'
+import ConflictModal from './ConflictModal'
 
 const FileUploader = ({ onUploadSuccess }) => {
   const [isDragOver, setIsDragOver] = useState(false)
@@ -10,6 +11,9 @@ const FileUploader = ({ onUploadSuccess }) => {
   const [uploadProgress, setUploadProgress] = useState({})
   const [isUploading, setIsUploading] = useState(false)
   const [uploadMode, setUploadMode] = useState('files') // 'files' or 'folder'
+  const [showConflictModal, setShowConflictModal] = useState(false)
+  const [conflicts, setConflicts] = useState([])
+  const [pendingUpload, setPendingUpload] = useState(null)
   const fileInputRef = useRef(null)
   const folderInputRef = useRef(null)
   const { showToast } = useToast()
@@ -77,13 +81,30 @@ const FileUploader = ({ onUploadSuccess }) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
   }
 
-  const uploadFiles = async () => {
-    if (selectedFiles.length === 0) return
+  // 检查文件冲突
+  const checkConflicts = async (files) => {
+    try {
+      const fileNames = files.map(fileItem => fileItem.relativePath || fileItem.file.name)
+      const response = await axios.post(`${API_CONFIG.baseURL}${API_CONFIG.endpoints.checkFiles}`, {
+        fileNames
+      })
+      
+      if (response.data.success) {
+        return response.data.conflicts || []
+      }
+      return []
+    } catch (error) {
+      console.error('检查文件冲突失败:', error)
+      return []
+    }
+  }
 
+  // 执行实际上传
+  const performUpload = async (filesToUpload) => {
     setIsUploading(true)
     const formData = new FormData()
     
-    selectedFiles.forEach(fileItem => {
+    filesToUpload.forEach(fileItem => {
       formData.append('files', fileItem.file)
     })
 
@@ -99,7 +120,7 @@ const FileUploader = ({ onUploadSuccess }) => {
           
           // 为所有文件设置相同的进度
           const newProgress = {}
-          selectedFiles.forEach(fileItem => {
+          filesToUpload.forEach(fileItem => {
             newProgress[fileItem.id] = percentCompleted
           })
           setUploadProgress(newProgress)
@@ -114,7 +135,7 @@ const FileUploader = ({ onUploadSuccess }) => {
         
         showToast({
           title: '上传成功',
-          description: `成功上传 ${selectedFiles.length} 个文件`,
+          description: `成功上传 ${filesToUpload.length} 个文件`,
           type: 'success'
         })
 
@@ -143,6 +164,40 @@ const FileUploader = ({ onUploadSuccess }) => {
     }
   }
 
+  const uploadFiles = async () => {
+    if (selectedFiles.length === 0) return
+
+    // 检查文件冲突
+    const conflictFiles = await checkConflicts(selectedFiles)
+    
+    if (conflictFiles.length > 0) {
+      // 有冲突，显示确认对话框
+      setConflicts(conflictFiles)
+      setPendingUpload(selectedFiles)
+      setShowConflictModal(true)
+    } else {
+      // 没有冲突，直接上传
+      await performUpload(selectedFiles)
+    }
+  }
+
+  // 处理冲突确认
+  const handleConflictConfirm = async () => {
+    setShowConflictModal(false)
+    if (pendingUpload) {
+      await performUpload(pendingUpload)
+    }
+    setPendingUpload(null)
+    setConflicts([])
+  }
+
+  // 处理冲突取消
+  const handleConflictCancel = () => {
+    setShowConflictModal(false)
+    setPendingUpload(null)
+    setConflicts([])
+  }
+
   const getStatusIcon = (status) => {
     switch (status) {
       case 'success':
@@ -156,6 +211,13 @@ const FileUploader = ({ onUploadSuccess }) => {
 
   return (
     <div className="space-y-4">
+      {/* 冲突确认模态框 */}
+      <ConflictModal
+        conflicts={conflicts}
+        onConfirm={handleConflictConfirm}
+        onCancel={handleConflictCancel}
+        isVisible={showConflictModal}
+      />
       {/* 拖拽上传区域 */}
       <div
         className={`
