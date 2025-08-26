@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react'
 import { Download, Trash2, File, RefreshCw } from 'lucide-react'
 import axios from 'axios'
 import { useToast } from './Toast'
+import { API_CONFIG } from '../config/api'
 
-const FileList = () => {
+const FileList = ({ refreshTrigger }) => {
   const [files, setFiles] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -13,7 +14,7 @@ const FileList = () => {
     try {
       setLoading(true)
       setError(null)
-      const response = await axios.get('/api/files')
+      const response = await axios.get(`${API_CONFIG.baseURL}${API_CONFIG.endpoints.files}`)
       
       if (response.data.success) {
         setFiles(response.data.files)
@@ -30,7 +31,7 @@ const FileList = () => {
 
   useEffect(() => {
     fetchFiles()
-  }, [])
+  }, [refreshTrigger])
 
   const formatFileSize = (bytes) => {
     if (bytes === 0) return '0 Bytes'
@@ -53,7 +54,7 @@ const FileList = () => {
 
   const handleDownload = async (filename) => {
     try {
-      const response = await axios.get(`/api/download/${encodeURIComponent(filename)}`, {
+      const response = await axios.get(`${API_CONFIG.baseURL}${API_CONFIG.endpoints.download}/${encodeURIComponent(filename)}`, {
         responseType: 'blob'
       })
       
@@ -88,7 +89,7 @@ const FileList = () => {
     }
 
     try {
-      const response = await axios.delete(`/api/files/${encodeURIComponent(filename)}`)
+      const response = await axios.delete(`${API_CONFIG.baseURL}${API_CONFIG.endpoints.delete}/${encodeURIComponent(filename)}`)
       
       if (response.data.success) {
         setFiles(prev => prev.filter(file => file.filename !== filename))

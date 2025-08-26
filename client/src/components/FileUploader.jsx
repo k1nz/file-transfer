@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react'
 import { Upload, File, X, CheckCircle, AlertCircle } from 'lucide-react'
 import axios from 'axios'
 import { useToast } from './Toast'
+import { API_CONFIG } from '../config/api'
 
 const FileUploader = ({ onUploadSuccess }) => {
   const [isDragOver, setIsDragOver] = useState(false)
@@ -70,7 +71,7 @@ const FileUploader = ({ onUploadSuccess }) => {
     })
 
     try {
-      const response = await axios.post('/api/upload', formData, {
+      const response = await axios.post(`${API_CONFIG.baseURL}${API_CONFIG.endpoints.upload}`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         },
