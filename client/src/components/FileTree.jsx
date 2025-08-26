@@ -81,7 +81,7 @@ const FileTreeNode = ({ item, onDownload, onDelete, level = 0 }) => {
           {/* 文件/文件夹信息 */}
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-gray-800 truncate">
-              {item.filename || 'Unknown'}
+              {item.name || 'Unknown'}
             </p>
             {item.type === 'file' && item.size && (
               <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
