@@ -23,11 +23,17 @@ const storage = multer.diskStorage({
         cb(null, uploadDir);
     },
     filename: (req, file, cb) => {
+        // 确保正确处理中文文件名
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        
         // 生成唯一文件名，保留原始扩展名
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-        const extension = path.extname(file.originalname);
-        const baseName = path.basename(file.originalname, extension);
-        cb(null, `${baseName}-${uniqueSuffix}${extension}`);
+        const extension = path.extname(originalName);
+        const baseName = path.basename(originalName, extension);
+        
+        // 构建文件名，确保中文字符正确显示
+        const fileName = `${baseName}-${uniqueSuffix}${extension}`;
+        cb(null, fileName);
     }
 });
 
@@ -65,13 +71,17 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             });
         }
 
-        const uploadedFiles = req.files.map(file => ({
-            originalName: file.originalname,
-            filename: file.filename,
-            size: file.size,
-            mimetype: file.mimetype,
-            uploadTime: new Date().toISOString()
-        }));
+        const uploadedFiles = req.files.map(file => {
+            // 正确解码中文文件名
+            const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+            return {
+                originalName: originalName,
+                filename: file.filename,
+                size: file.size,
+                mimetype: file.mimetype,
+                uploadTime: new Date().toISOString()
+            };
+        });
 
         console.log(`成功上传 ${uploadedFiles.length} 个文件:`);
         uploadedFiles.forEach(file => {
