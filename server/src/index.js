@@ -13,8 +13,37 @@ if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
 
+// CORS 配置 - 允许局域网访问
+const corsOptions = {
+    origin: function (origin, callback) {
+        // 允许没有 origin 的请求（如移动应用、Postman）
+        if (!origin) return callback(null, true);
+        
+        // 允许所有 localhost 和局域网地址
+        const allowedOrigins = [
+            /^http:\/\/localhost(:\d+)?$/,
+            /^http:\/\/127\.0\.0\.1(:\d+)?$/,
+            /^http:\/\/192\.168\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+            /^http:\/\/10\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/,
+            /^http:\/\/172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}(:\d+)?$/
+        ];
+        
+        const isAllowed = allowedOrigins.some(pattern => pattern.test(origin));
+        
+        if (isAllowed) {
+            callback(null, true);
+        } else {
+            console.log(`❌ CORS: 拒绝来自 ${origin} 的请求`);
+            callback(new Error('不允许的 CORS 来源'));
+        }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
+};
+
 // 中间件
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // 配置 multer 用于文件上传
@@ -213,8 +242,46 @@ app.use((error, req, res, next) => {
     });
 });
 
-// 启动服务器
-app.listen(PORT, () => {
-    console.log(`🚀 文件传输服务器运行在 http://localhost:${PORT}`);
+// 获取本机 IP 地址的函数
+const getLocalIPAddress = () => {
+    const { networkInterfaces } = require('os');
+    const nets = networkInterfaces();
+    const results = [];
+
+    for (const name of Object.keys(nets)) {
+        for (const net of nets[name]) {
+            // 跳过非 IPv4 和内部（即 127.x.x.x）地址
+            if (net.family === 'IPv4' && !net.internal) {
+                results.push(net.address);
+            }
+        }
+    }
+    return results;
+};
+
+// 启动服务器 - 监听所有网络接口
+app.listen(PORT, '0.0.0.0', () => {
+    const localIPs = getLocalIPAddress();
+    
+    console.log(`🚀 文件传输服务器已启动`);
     console.log(`📁 文件存储目录: ${uploadDir}`);
+    console.log(`\n🌐 访问地址:`);
+    console.log(`   本地访问: http://localhost:${PORT}`);
+    console.log(`   本地访问: http://127.0.0.1:${PORT}`);
+    
+    if (localIPs.length > 0) {
+        console.log(`\n🔗 局域网访问:`);
+        localIPs.forEach(ip => {
+            console.log(`   http://${ip}:${PORT}`);
+        });
+        console.log(`\n💡 其他设备可以通过上述局域网地址访问文件传输服务`);
+    } else {
+        console.log(`\n⚠️  未检测到局域网 IP 地址`);
+    }
+    
+    console.log(`\n📋 API 端点:`);
+    console.log(`   GET  /              - 服务器信息`);
+    console.log(`   POST /api/upload    - 文件上传`);
+    console.log(`   GET  /api/files     - 文件列表`);
+    console.log(`   GET  /api/download  - 文件下载`);
 });

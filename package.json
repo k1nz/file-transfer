@@ -12,7 +12,9 @@
     "start": "pnpm --filter server run start",
     "clean": "pnpm --recursive run clean",
     "lint": "pnpm --recursive run lint",
-    "install:all": "pnpm install"
+    "install:all": "pnpm install",
+    "network": "node scripts/network-info.js",
+    "network:info": "node scripts/network-info.js"
   },
   "keywords": ["file-transfer", "nodejs", "react", "upload", "monorepo"],
   "author": "Your Name",
