@@ -161,8 +161,13 @@ const FileUploader = ({ onUploadSuccess }) => {
     setIsUploading(true)
     const formData = new FormData()
     
-    filesToUpload.forEach(fileItem => {
+    // 添加文件和路径信息
+    filesToUpload.forEach((fileItem, index) => {
       formData.append('files', fileItem.file)
+      // 添加相对路径信息
+      if (fileItem.relativePath && fileItem.relativePath !== fileItem.file.name) {
+        formData.append(`relativePath[files[${index}]]`, fileItem.relativePath)
+      }
     })
 
     try {

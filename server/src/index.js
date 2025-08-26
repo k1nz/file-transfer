@@ -78,8 +78,7 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => {
         // 确保正确处理中文文件名
         const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        
-        // 直接使用原文件名
+        // 直接使用原文件名，稍后在上传处理中处理路径
         cb(null, originalName);
     }
 });
@@ -123,6 +122,12 @@ app.post('/api/check-files', (req, res) => {
         const conflicts = [];
         fileNames.forEach(fileName => {
             const filePath = path.join(uploadDir, fileName);
+            
+            // 安全检查：确保文件路径在上传目录内
+            if (!filePath.startsWith(uploadDir)) {
+                return;
+            }
+            
             if (fs.existsSync(filePath)) {
                 conflicts.push(fileName);
             }
@@ -152,21 +157,57 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
             });
         }
 
-        const uploadedFiles = req.files.map(file => {
+        const uploadedFiles = [];
+
+        // 处理每个文件
+        req.files.forEach((file, index) => {
             // 正确解码中文文件名
             const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-            return {
-                originalName: originalName,
-                filename: file.filename,
-                size: file.size,
-                mimetype: file.mimetype,
-                uploadTime: new Date().toISOString()
-            };
+            
+            // 获取相对路径
+            const fieldName = `relativePath[files[${index}]]`;
+            const relativePath = req.body[fieldName] || originalName;
+            
+            // 如果有相对路径且不等于文件名，说明是文件夹上传
+            if (relativePath !== originalName) {
+                // 计算目标路径
+                const targetDir = path.join(uploadDir, path.dirname(relativePath));
+                const targetPath = path.join(uploadDir, relativePath);
+                
+                // 确保目标目录存在
+                if (!fs.existsSync(targetDir)) {
+                    fs.mkdirSync(targetDir, { recursive: true });
+                }
+                
+                // 移动文件到正确的位置
+                fs.renameSync(file.path, targetPath);
+                
+                uploadedFiles.push({
+                    originalName: originalName,
+                    filename: path.basename(relativePath),
+                    relativePath: relativePath,
+                    fullPath: relativePath,
+                    size: file.size,
+                    mimetype: file.mimetype,
+                    uploadTime: new Date().toISOString()
+                });
+            } else {
+                // 普通文件上传，文件已经在正确位置
+                uploadedFiles.push({
+                    originalName: originalName,
+                    filename: file.filename,
+                    relativePath: originalName,
+                    fullPath: originalName,
+                    size: file.size,
+                    mimetype: file.mimetype,
+                    uploadTime: new Date().toISOString()
+                });
+            }
         });
 
         console.log(`成功上传 ${uploadedFiles.length} 个文件:`);
         uploadedFiles.forEach(file => {
-            console.log(`- ${file.originalName} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
+            console.log(`- ${file.relativePath} (${(file.size / 1024 / 1024).toFixed(2)}MB)`);
         });
 
         res.json({
@@ -185,25 +226,49 @@ app.post('/api/upload', upload.array('files'), (req, res) => {
     }
 });
 
-// 获取已上传文件列表
-app.get('/api/files', (req, res) => {
-    try {
-        const files = fs.readdirSync(uploadDir);
-        const fileList = files.map(filename => {
-            const filePath = path.join(uploadDir, filename);
-            const stats = fs.statSync(filePath);
-            
-            return {
-                filename,
+// 递归读取文件夹结构
+const readDirectoryStructure = (dir, relativePath = '') => {
+    const items = [];
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const itemRelativePath = path.join(relativePath, entry.name);
+        
+        if (entry.isDirectory()) {
+            // 递归读取子文件夹
+            const children = readDirectoryStructure(fullPath, itemRelativePath);
+            items.push({
+                name: entry.name,
+                type: 'directory',
+                path: itemRelativePath,
+                children: children
+            });
+        } else {
+            // 文件
+            const stats = fs.statSync(fullPath);
+            items.push({
+                name: entry.name,
+                type: 'file',
+                path: itemRelativePath,
                 size: stats.size,
                 uploadTime: stats.birthtime.toISOString(),
                 modifiedTime: stats.mtime.toISOString()
-            };
-        });
+            });
+        }
+    }
+    
+    return items;
+};
 
+// 获取已上传文件列表
+app.get('/api/files', (req, res) => {
+    try {
+        const fileStructure = readDirectoryStructure(uploadDir);
+        
         res.json({
             success: true,
-            files: fileList
+            files: fileStructure
         });
     } catch (error) {
         console.error('获取文件列表错误:', error);
@@ -216,19 +281,31 @@ app.get('/api/files', (req, res) => {
 });
 
 // 文件下载接口
-app.get('/api/download/:filename', (req, res) => {
+app.get('/api/download/*', (req, res) => {
     try {
-        const filename = req.params.filename;
-        const filePath = path.join(uploadDir, filename);
+        // 获取完整的文件路径（支持子文件夹）
+        const filePath = req.params[0];
+        const fullPath = path.join(uploadDir, filePath);
 
-        if (!fs.existsSync(filePath)) {
+        // 安全检查：确保文件路径在上传目录内
+        if (!fullPath.startsWith(uploadDir)) {
+            return res.status(403).json({
+                success: false,
+                message: '访问被拒绝'
+            });
+        }
+
+        if (!fs.existsSync(fullPath)) {
             return res.status(404).json({
                 success: false,
                 message: '文件不存在'
             });
         }
 
-        res.download(filePath, filename, (err) => {
+        // 获取文件名用于下载
+        const filename = path.basename(filePath);
+        
+        res.download(fullPath, filename, (err) => {
             if (err) {
                 console.error('文件下载错误:', err);
                 res.status(500).json({
@@ -248,24 +325,44 @@ app.get('/api/download/:filename', (req, res) => {
 });
 
 // 删除文件接口
-app.delete('/api/files/:filename', (req, res) => {
+app.delete('/api/files/*', (req, res) => {
     try {
-        const filename = req.params.filename;
-        const filePath = path.join(uploadDir, filename);
+        // 获取完整的文件路径（支持子文件夹）
+        const filePath = req.params[0];
+        const fullPath = path.join(uploadDir, filePath);
 
-        if (!fs.existsSync(filePath)) {
+        // 安全检查：确保文件路径在上传目录内
+        if (!fullPath.startsWith(uploadDir)) {
+            return res.status(403).json({
+                success: false,
+                message: '访问被拒绝'
+            });
+        }
+
+        if (!fs.existsSync(fullPath)) {
             return res.status(404).json({
                 success: false,
                 message: '文件不存在'
             });
         }
 
-        fs.unlinkSync(filePath);
+        const stats = fs.statSync(fullPath);
         
-        res.json({
-            success: true,
-            message: '文件删除成功'
-        });
+        if (stats.isDirectory()) {
+            // 删除文件夹及其内容
+            fs.rmSync(fullPath, { recursive: true, force: true });
+            res.json({
+                success: true,
+                message: '文件夹删除成功'
+            });
+        } else {
+            // 删除文件
+            fs.unlinkSync(fullPath);
+            res.json({
+                success: true,
+                message: '文件删除成功'
+            });
+        }
     } catch (error) {
         console.error('文件删除错误:', error);
         res.status(500).json({
