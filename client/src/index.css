@@ -33,5 +33,32 @@
   }
   body {
     @apply bg-background text-foreground;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  }
+}
+
+@layer components {
+  .file-table-header {
+    @apply bg-gray-50 px-4 py-3 border-b border-gray-200 text-sm font-medium text-gray-700;
+  }
+  
+  .file-icon-pdf {
+    @apply w-6 h-6 bg-red-100 rounded text-red-600 flex items-center justify-center text-xs font-bold;
+  }
+  
+  .file-icon-image {
+    @apply w-6 h-6 bg-green-100 rounded text-green-600 flex items-center justify-center text-xs font-bold;
+  }
+  
+  .file-icon-video {
+    @apply w-6 h-6 bg-purple-100 rounded text-purple-600 flex items-center justify-center text-xs font-bold;
+  }
+  
+  .file-icon-design {
+    @apply w-6 h-6 bg-pink-100 rounded text-pink-600 flex items-center justify-center text-xs font-bold;
+  }
+  
+  .file-icon-document {
+    @apply w-6 h-6 bg-blue-100 rounded text-blue-600 flex items-center justify-center text-xs font-bold;
   }
 }

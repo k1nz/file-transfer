@@ -280,65 +280,64 @@ const FileUploader = ({ onUploadSuccess }) => {
         onCancel={handleConflictCancel}
         isVisible={showConflictModal}
       />
+      
+      {/* 上传模式选择 */}
+      <div className="flex items-center justify-center gap-6 mb-4">
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="radio"
+            value="files"
+            checked={uploadMode === 'files'}
+            onChange={(e) => setUploadMode(e.target.value)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+          />
+          <span className="ml-2 text-sm font-medium text-gray-700">选择文件</span>
+        </label>
+        <label className="flex items-center cursor-pointer">
+          <input
+            type="radio"
+            value="folder"
+            checked={uploadMode === 'folder'}
+            onChange={(e) => setUploadMode(e.target.value)}
+            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
+          />
+          <span className="ml-2 text-sm font-medium text-gray-700">选择文件夹</span>
+        </label>
+      </div>
+
       {/* 拖拽上传区域 */}
       <div
         className={`
-          border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200
+          border-2 border-dashed rounded-lg transition-all duration-200 cursor-pointer
           ${isDragOver 
-            ? 'border-blue-400 bg-blue-50' 
-            : 'border-gray-300 bg-white hover:border-gray-400'
+            ? 'border-blue-400 bg-blue-50/50' 
+            : 'border-gray-300 hover:border-blue-400 hover:bg-blue-50/30'
           }
         `}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
+        onClick={() => {
+          if (uploadMode === 'files') {
+            fileInputRef.current?.click()
+          } else {
+            folderInputRef.current?.click()
+          }
+        }}
       >
-        <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-        <p className="text-lg font-medium text-gray-700 mb-2">
-          拖拽文件或文件夹到此处上传
-        </p>
-        <p className="text-sm text-gray-500 mb-4">
-          支持单个文件、多个文件、文件夹拖拽，或点击下方按钮选择
-        </p>
-        
-        {/* 上传模式选择 */}
-        <div className="flex items-center justify-center gap-4 mb-4">
-          <label className="flex items-center">
-            <input
-              type="radio"
-              value="files"
-              checked={uploadMode === 'files'}
-              onChange={(e) => setUploadMode(e.target.value)}
-              className="mr-2"
-            />
-            <span className="text-sm text-gray-700">文件</span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="radio"
-              value="folder"
-              checked={uploadMode === 'folder'}
-              onChange={(e) => setUploadMode(e.target.value)}
-              className="mr-2"
-            />
-            <span className="text-sm text-gray-700">文件夹</span>
-          </label>
-        </div>
-        
-        <div className="space-x-3">
+        <div className="p-8 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center">
+            <Upload className="h-8 w-8 text-blue-600" />
+          </div>
           <button
             type="button"
-            onClick={() => {
-              if (uploadMode === 'files') {
-                fileInputRef.current?.click()
-              } else {
-                folderInputRef.current?.click()
-              }
-            }}
-            className="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-md transition-colors"
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors mb-2"
           >
             {uploadMode === 'files' ? '选择文件' : '选择文件夹'}
           </button>
+          <p className="text-sm text-gray-500">
+            或拖拽{uploadMode === 'files' ? '文件' : '文件夹'}到此处
+          </p>
         </div>
         
         <input
@@ -360,64 +359,74 @@ const FileUploader = ({ onUploadSuccess }) => {
 
       {/* 选中文件列表 */}
       {selectedFiles.length > 0 && (
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="font-medium text-gray-800">
-              待上传文件 ({selectedFiles.length})
-            </h3>
-            <button
-              onClick={uploadFiles}
-              disabled={isUploading}
-              className="bg-green-500 hover:bg-green-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-md transition-colors"
-            >
-              {isUploading ? '上传中...' : '开始上传'}
-            </button>
+        <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+            <div className="flex justify-between items-center">
+              <h3 className="font-semibold text-gray-900">
+                待上传文件 ({selectedFiles.length})
+              </h3>
+              <button
+                onClick={uploadFiles}
+                disabled={isUploading}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg font-medium transition-colors disabled:cursor-not-allowed"
+              >
+                {isUploading ? '上传中...' : '开始上传'}
+              </button>
+            </div>
           </div>
           
-          <div className="space-y-2">
-            {selectedFiles.map((fileItem) => (
+          <div className="divide-y divide-gray-200">
+            {selectedFiles.map((fileItem, index) => (
               <div
                 key={fileItem.id}
-                className="flex items-center justify-between p-3 bg-gray-50 rounded-md"
+                className="px-6 py-4 hover:bg-gray-50 transition-colors"
               >
-                <div className="flex items-center space-x-3 flex-1">
-                  {getStatusIcon(fileItem.status)}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-800 truncate">
-                      {fileItem.relativePath || fileItem.file.name}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {formatFileSize(fileItem.file.size)}
-                      {fileItem.relativePath && fileItem.relativePath !== fileItem.file.name && (
-                        <span className="ml-2 text-blue-500">📁 文件夹上传</span>
-                      )}
-                    </p>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4 flex-1 min-w-0">
+                    <div className="flex-shrink-0">
+                      {getStatusIcon(fileItem.status)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {fileItem.relativePath || fileItem.file.name}
+                      </p>
+                      <div className="flex items-center space-x-4 text-xs text-gray-500 mt-1">
+                        <span>{formatFileSize(fileItem.file.size)}</span>
+                        {fileItem.relativePath && fileItem.relativePath !== fileItem.file.name && (
+                          <span className="text-blue-600 font-medium">📁 文件夹上传</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center space-x-4">
+                    {/* 进度条 */}
+                    {uploadProgress[fileItem.id] !== undefined && (
+                      <div className="w-32">
+                        <div className="flex justify-between text-xs text-gray-500 mb-1">
+                          <span>进度</span>
+                          <span>{uploadProgress[fileItem.id]}%</span>
+                        </div>
+                        <div className="bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress[fileItem.id]}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {!isUploading && fileItem.status === 'pending' && (
+                      <button
+                        onClick={() => removeFile(fileItem.id)}
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-lg hover:bg-gray-100"
+                        title="移除文件"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
-                
-                {/* 进度条 */}
-                {uploadProgress[fileItem.id] !== undefined && (
-                  <div className="w-24 mx-3">
-                    <div className="bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${uploadProgress[fileItem.id]}%` }}
-                      ></div>
-                    </div>
-                    <p className="text-xs text-center text-gray-500 mt-1">
-                      {uploadProgress[fileItem.id]}%
-                    </p>
-                  </div>
-                )}
-                
-                {!isUploading && fileItem.status === 'pending' && (
-                  <button
-                    onClick={() => removeFile(fileItem.id)}
-                    className="text-gray-400 hover:text-red-500 transition-colors"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                )}
               </div>
             ))}
           </div>

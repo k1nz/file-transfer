@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, FolderOpen } from 'lucide-react'
 import axios from 'axios'
 import { useToast } from './Toast'
 import { API_CONFIG } from '../config/api'
@@ -117,28 +117,44 @@ const FileList = ({ refreshTrigger }) => {
     )
   }
 
-  return (
-    <div className="bg-white rounded-lg border border-gray-200">
-      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-        <h3 className="font-medium text-gray-800">
-          文件列表
-        </h3>
-        <button
-          onClick={fetchFiles}
-          className="text-blue-500 hover:text-blue-600 transition-colors"
-          title="刷新列表"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
+  if (files.length === 0 && !loading && !error) {
+    return (
+      <div className="p-8 text-center">
+        <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+          <FolderOpen className="h-8 w-8 text-gray-400" />
+        </div>
+        <p className="text-gray-500 mb-2">暂无文件</p>
+        <p className="text-sm text-gray-400">上传一些文件开始使用</p>
       </div>
-      
-      <div className="min-h-[200px]">
+    )
+  }
+
+  return (
+    <div className="min-h-[300px]">
+      {loading ? (
+        <div className="p-8 text-center">
+          <div className="flex items-center justify-center space-x-2 text-gray-500">
+            <RefreshCw className="h-5 w-5 animate-spin" />
+            <span>加载中...</span>
+          </div>
+        </div>
+      ) : error ? (
+        <div className="p-8 text-center">
+          <p className="text-red-600 mb-4">{error}</p>
+          <button
+            onClick={fetchFiles}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors"
+          >
+            重试
+          </button>
+        </div>
+      ) : (
         <FileTree 
           files={files}
           onDownload={handleDownload}
           onDelete={handleDelete}
         />
-      </div>
+      )}
     </div>
   )
 }
